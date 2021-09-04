@@ -3,7 +3,7 @@ from app import app, CURR_USER_KEY
 import os
 from unittest import TestCase
 
-from models import db, connect_db, Message, User, Likes
+from models import Follows, db, connect_db, Message, User, Likes
 
 # BEFORE we import our app, let's set an environmental variable
 # to use a different database for tests (we need to do this
@@ -61,15 +61,20 @@ class UserViewTestCase(TestCase):
 
     def test_add_like(self):
 
+        u2 = User.signup(
+            username='Test2',
+            email='test2@email2.com',
+            password='password',
+            image_url=None
+        )
         m = Message(id=1984, text="The earth is round", user_id=self.u.id)
-        l = Likes(message_id=m.id, user_id=self.u.id)
 
-        db.session.add(m, l)
+        db.session.add_all([u2, m])
         db.session.commit()
 
         with self.client as c:
             with c.session_transaction() as sess:
-                sess[CURR_USER_KEY] = self.u.id
+                sess[CURR_USER_KEY] = u2.id
 
             resp = c.post("/users/add_like/1984",
                           follow_redirects=True)
@@ -78,4 +83,23 @@ class UserViewTestCase(TestCase):
             likes = Likes.query.filter(Likes.message_id == 1984).all()
 
             self.assertEqual(len(likes), 1)
-            self.assertEqual(likes[0].user_id, self.u.id)
+
+    def test_add_follow(self):
+
+        u3 = User.signup(
+            username='Test3',
+            email='test2@email2.com',
+            password='password',
+            image_url=None
+        )
+        db.session.add(u3)
+        db.session.commit()
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = u3.id
+
+            resp = c.post(f'/users/follow/{self.u.id}', follow_redirects=True)
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('@Test3', str(resp.data))
