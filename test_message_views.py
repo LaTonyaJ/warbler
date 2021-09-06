@@ -74,19 +74,21 @@ class MessageViewTestCase(TestCase):
 
     def test_view_message(self):
 
-        m = Message(
+        msg = Message(
             id=12345,
             user_id=self.testuser.id,
             text='View Message'
         )
+        db.session.add(msg)
+        db.session.commit()
 
         with self.client as c:
             with c.session_transaction() as sess:
                 sess[CURR_USER_KEY] = self.testuser.id
 
-        m = Message.query.get(m.id)
+        m = Message.query.get(msg.id)
 
-        resp = c.get(f'/messages/{m.id}')
+        resp = c.get(f'/messages/{msg.id}')
 
         self.assertEqual(resp.status_code, 200)
         self.assertIn(m.text, str(resp.data))
@@ -98,14 +100,17 @@ class MessageViewTestCase(TestCase):
             user_id=self.testuser.id,
             text='Delete Me'
         )
+        db.session.add(m)
+        db.session.commit()
 
         with self.client as c:
             with c.session_transaction() as sess:
                 sess[CURR_USER_KEY] = self.testuser.id
 
-            m = Message.query.get(m.id)
+            resp = c.post(f'/messages/{m.id}/delete', follow_redirects=True)
 
-            resp = c.post(f'/messages/{m.id}/delete')
+            usermessages = Message.query.filter_by(
+                user_id=self.testuser.id).all()
 
             self.assertEqual(resp.status_code, 200)
-            self.assertEqual(len(self.testuser.messages), 0)
+            self.assertEqual(len(usermessages), 0)
